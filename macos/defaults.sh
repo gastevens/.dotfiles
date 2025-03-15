@@ -1,4 +1,6 @@
 COMPUTER_NAME="Greg's Mac Mini"
+# Create a sanitized version of COMPUTER_NAME for LocalHostName (lowercase, no spaces/special chars)
+COMPUTER_NAME_SAFE=$(echo "$COMPUTER_NAME" | tr '[:upper:]' '[:lower:]' | sed -e 's/[^a-zA-Z0-9]/-/g')
 LANGUAGES=(en nl)
 LOCALE="en_US@currency=USD"
 MEASUREMENT_UNITS="Inches"
@@ -25,8 +27,7 @@ osascript -e 'tell application "System Preferences" to quit'
 # Ask for the administrator password upfront
 sudo -v
 
-# Keep-alive: update existing `sudo` time stamp until this script has finished
-while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
+# Keep-alive sudo timestamp is removed as it wasn't working as intended
 
 ###############################################################################
 # Computer & Host name                                                        #
@@ -35,7 +36,7 @@ while true; do sudo -n true; sleep 60; kill -0 "$$" || exit; done 2>/dev/null &
 # Set computer name (as done via System Preferences → Sharing)
 sudo scutil --set ComputerName "$COMPUTER_NAME"
 sudo scutil --set HostName "$COMPUTER_NAME"
-sudo scutil --set LocalHostName "$COMPUTER_NAME"
+sudo scutil --set LocalHostName "$COMPUTER_NAME_SAFE"
 sudo defaults write /Library/Preferences/SystemConfiguration/com.apple.smb.server NetBIOSName -string "$COMPUTER_NAME"
 
 ###############################################################################
@@ -377,5 +378,7 @@ defaults write com.apple.commerce AutoUpdateRestartRequired -bool true
 ###############################################################################
 
 for app in "Address Book" "Calendar" "Contacts" "Dock" "Finder" "Mail" "Safari" "SystemUIServer" "iCal"; do
-  killall "${app}" &> /dev/null
+  if pgrep "$app" > /dev/null; then
+    killall "$app" || true
+  fi
 done
