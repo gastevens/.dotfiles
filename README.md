@@ -1,89 +1,153 @@
-# .files
+# Gregory's Dotfiles
 
-These are my dotfiles. Take anything you want, but at your own risk.
+My personal dotfiles for macOS development environment setup. This repository contains configuration files for ZSH, Git, and various command-line tools to enhance productivity and ensure consistent setups across machines.
 
-It mainly targets macOS systems (should install on e.g. Ubuntu as well for many tools, config and aliases etc).
+## Features
 
-## Highlights
+- **Modern ZSH Configuration**: Modular structure with Oh My Zsh and Powerlevel10k theme
+- **Easy Installation**: Minimal effort to install everything using GNU Stow and Makefile
+- **Package Management**: Homebrew with Brewfile for consistent software installation
+- **macOS Optimizations**: Custom settings and productivity enhancements
+- **Well-organized and Modular**: Easy to understand, maintain, and customize
+- **Supports Apple Silicon and Intel Macs**: Tested on various macOS versions
 
-- Minimal efforts to install everything, using a [Makefile](./Makefile)
-- Mostly based around Homebrew, Caskroom and Node.js, latest Bash + GNU Utils
-- Fast and colored prompt
-- Updated macOS defaults
-- Well-organized and easy to customize
-- The installation and runcom setup is
-  [tested weekly on real Ubuntu and macOS machines](https://github.com/webpro/dotfiles/actions)
-  (Ventura/13, Sonomo/14, Sequoia/15) using [a GitHub Action](./.github/workflows/dotfiles-installation.yml)
-- Supports both Apple Silicon (M1) and Intel chips
+## Directory Structure
 
-## Packages Overview
-
-- [Homebrew](https://brew.sh) (packages: [Brewfile](./install/Brewfile))
-- [homebrew-cask](https://github.com/Homebrew/homebrew-cask) (packages: [Caskfile](./install/Caskfile))
-- [Node.js + npm LTS](https://nodejs.org/en/download/) (packages: [npmfile](./install/npmfile))
-- Latest Git, Bash, Python, GNU coreutils, curl, Ruby
-- `$EDITOR` is [GNU nano](https://www.nano-editor.org) (`$VISUAL` is `code` and Git `core.editor` is `code --wait`)
+```
+~/.dotfiles/
+├── bin/                   # Custom scripts and executables
+├── config/                # Configuration files symlinked to ~/.config
+│   ├── git/               # Git configuration
+│   ├── tmux/              # Tmux configuration
+│   ├── zsh/               # Modular ZSH configuration
+│   │   ├── aliases.zsh    # Command aliases
+│   │   ├── completions.zsh # Tab completion settings
+│   │   ├── exports.zsh    # Environment variables
+│   │   ├── functions.zsh  # Shell functions
+│   │   ├── keybindings.zsh # Custom key bindings
+│   │   ├── oh-my-zsh.zsh  # Oh My Zsh settings
+│   │   ├── path.zsh       # PATH modifications
+│   │   ├── private.zsh    # Private/sensitive settings (gitignored)
+│   │   └── utils.zsh      # Utility functions
+│   └── ...
+├── install/               # Installation scripts
+│   └── oh-my-zsh.sh       # Oh My Zsh and plugins installer
+├── macos/                 # macOS-specific settings and scripts
+├── runcom/                # Run commands, like .zshrc, .bashrc
+│   └── .zshrc             # Main ZSH configuration file
+├── system/                # System configuration
+├── Brewfile               # Homebrew packages
+├── Makefile               # Installation automation
+└── README.md              # This file
+```
 
 ## Installation
 
-On a sparkling fresh installation of macOS:
+### On a fresh macOS installation:
+
+1. Install Apple's Command Line Tools:
 
 ```bash
-sudo softwareupdate -i -a
 xcode-select --install
 ```
 
-The Xcode Command Line Tools includes `git` and `make` (not available on stock macOS). Now there are two options:
-
-1. Install this repo with `curl` available:
+2. Clone this repository:
 
 ```bash
-bash -c "`curl -fsSL https://raw.githubusercontent.com/webpro/dotfiles/master/remote-install.sh`"
+git clone https://github.com/gastevens/.dotfiles.git ~/.dotfiles
 ```
 
-This will clone or download this repo to `~/.dotfiles` (depending on the availability of `git`, `curl` or `wget`).
-
-1. Alternatively, clone manually into the desired location:
+3. Install Homebrew (if not already installed):
 
 ```bash
-git clone https://github.com/webpro/dotfiles.git ~/.dotfiles
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
 ```
 
-2. Use the [Makefile](./Makefile) to install the [packages listed above](#packages-overview), and symlink
-   [runcom](./runcom) and [config](./config) files (using [stow](https://www.gnu.org/software/stow/)):
+4. Install GNU Stow:
+
+```bash
+brew install stow
+```
+
+5. Use Stow to create symlinks:
 
 ```bash
 cd ~/.dotfiles
-make
+stow -t ~ runcom
+stow -t ~/.config config
 ```
 
-Running `make` with the Makefile is idempotent. The installation process in the Makefile is tested on every push and every week in this
-[GitHub Action](https://github.com/webpro/dotfiles/actions). Please file an issue in this repo if there are errors.
+6. Install Oh My Zsh and plugins:
+
+```bash
+chmod +x ~/.dotfiles/install/oh-my-zsh.sh
+~/.dotfiles/install/oh-my-zsh.sh
+```
+
+7. Install packages using Homebrew:
+
+```bash
+brew bundle --file=~/.dotfiles/Brewfile
+```
+
+## ZSH Configuration
+
+The ZSH configuration is organized into modular files in `~/.dotfiles/config/zsh/`:
+
+- **aliases.zsh**: Command shortcuts and aliases
+- **completions.zsh**: Tab completion settings and customizations
+- **exports.zsh**: Environment variables 
+- **functions.zsh**: Custom shell functions
+- **keybindings.zsh**: Custom key bindings for enhanced navigation
+- **oh-my-zsh.zsh**: Oh My Zsh specific settings
+- **path.zsh**: PATH environment variable modifications
+- **private.zsh**: Private environment variables (gitignored)
+- **utils.zsh**: Utility functions and brew-wrap
+
+### Included Oh My Zsh Plugins
+
+- git: Git integration and shortcuts
+- macos: macOS-specific commands and aliases
+- docker: Docker commands and completion
+- npm: npm commands and completion
+- zoxide: Smarter cd command (replaces autojump)
+- thefuck: Corrects your previous console command
+- zsh-autosuggestions: Fish-like autosuggestions
+- zsh-syntax-highlighting: Syntax highlighting for commands
+- web-search: Quick web searches from terminal
+- And more...
 
 ## Post-Installation
 
 1. Set your Git credentials:
 
 ```sh
-git config --global user.name "your name"
+git config --global user.name "Your Name"
 git config --global user.email "your@email.com"
 git config --global github.user "your-github-username"
 ```
 
-2. Set macOS [Dock items](./macos/dock.sh) and [system defaults](./macos/defaults.sh):
+2. Set macOS system defaults:
 
 ```sh
-dot dock
 dot macos
 ```
 
-3. Populate this file with tokens (example: `export GITHUB_TOKEN=abc`):
+3. Configure Powerlevel10k theme (if not already configured):
 
 ```sh
-touch ~/.dotfiles/system/.exports
+p10k configure
 ```
 
-## The `dot` command
+4. Add private environment variables:
+
+```sh
+nano ~/.dotfiles/config/zsh/private.zsh
+```
+
+## The `dot` Command
+
+The `dot` command provides easy access to common dotfiles maintenance tasks:
 
 ```
 $ dot help
@@ -92,17 +156,47 @@ Usage: dot <command>
 Commands:
    clean            Clean up caches (brew, cargo, gem, pip)
    dock             Apply macOS Dock settings
-   edit             Open dotfiles in IDE ($VISUAL) and Git GUI ($VISUAL_GIT)
+   duti             Set default apps for file types (UTI)
+   edit             Open dotfiles in IDE (code) and Git GUI
    help             This help message
    macos            Apply macOS system defaults
    test             Run tests
    update           Update packages and pkg managers (brew, casks, cargo, pip3, npm, gems, macOS)
 ```
 
-## Customize
+## Customization
 
-To customize the dotfiles to your likings, fork it and [be the king of your castle!](https://www.webpro.nl/articles/getting-started-with-dotfiles)
+To customize these dotfiles to your preferences:
+
+1. **Adding aliases**: Edit `~/.dotfiles/config/zsh/aliases.zsh`
+2. **Adding functions**: Edit `~/.dotfiles/config/zsh/functions.zsh` or `~/.dotfiles/config/zsh/utils.zsh`
+3. **Changing PATH**: Edit `~/.dotfiles/config/zsh/path.zsh`
+4. **Private settings**: Add sensitive information to `~/.dotfiles/config/zsh/private.zsh`
+5. **Adding Oh My Zsh plugins**: Edit the `plugins=()` list in `~/.dotfiles/runcom/.zshrc`
+
+## Maintenance
+
+### Keeping dotfiles in sync across machines:
+
+```bash
+# Pull latest changes
+cd ~/.dotfiles
+git pull
+
+# Push your changes
+cd ~/.dotfiles
+git add -u
+git commit -m "description of changes"
+git push
+```
+
+### Adding new tools:
+
+1. Install via Homebrew: `brew install tool-name`
+2. Add to Brewfile: `brew bundle dump --force --file=~/.dotfiles/Brewfile`
 
 ## Credits
 
-Many thanks to the [dotfiles community](https://dotfiles.github.io).
+- Inspired by the [dotfiles community](https://dotfiles.github.io)
+- Oh My Zsh: [ohmyzsh/ohmyzsh](https://github.com/ohmyzsh/ohmyzsh)
+- Powerlevel10k: [romkatv/powerlevel10k](https://github.com/romkatv/powerlevel10k)
