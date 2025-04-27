@@ -15,7 +15,9 @@ sub_help () {
   echo "   help             This help message"
   echo "   macos            Apply macOS system defaults"
   echo "   test             Run tests"
-  echo "   update           Update packages and pkg managers (brew, casks, cargo, pip3, npm, gems, macOS)"
+  echo "   update           Update packages using topgrade"
+  echo "   update-packages  Update all packages and generate new Brewfile"
+  echo "   verify-setup     Verify dotfiles setup and configuration"
 }
 
 sub_clean () {
@@ -43,7 +45,28 @@ sub_test () {
 }
 
 sub_update () {
+  echo "Running topgrade to update all packages..."
   topgrade
+}
+
+sub_update_packages () {
+  if [ -x "${DOTFILES_DIR}/bin/dot-update-packages" ]; then
+    "${DOTFILES_DIR}/bin/dot-update-packages"
+  else
+    echo "Error: update-packages script not found or not executable."
+    echo "Check that ${DOTFILES_DIR}/bin/dot-update-packages exists and has execute permissions."
+    return 1
+  fi
+}
+
+sub_verify_setup () {
+  if [ -x "${DOTFILES_DIR}/bin/dot-verify-setup" ]; then
+    "${DOTFILES_DIR}/bin/dot-verify-setup"
+  else
+    echo "Error: verify-setup script not found or not executable."
+    echo "Check that ${DOTFILES_DIR}/bin/dot-verify-setup exists and has execute permissions."
+    return 1
+  fi
 }
 
 sub_duti () {
