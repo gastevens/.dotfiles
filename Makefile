@@ -43,10 +43,13 @@ link: stow-$(OS)
 	for FILE in $$(\ls -A runcom); do if [ -f $(HOME)/$$FILE -a ! -h $(HOME)/$$FILE ]; then \
 		mv -v $(HOME)/$$FILE{,.bak}; fi; done
 	mkdir -p "$(XDG_CONFIG_HOME)"
+	mkdir -p "$(XDG_CONFIG_HOME)/zsh"
 	stow -t "$(HOME)" runcom
 	stow -t "$(XDG_CONFIG_HOME)" config
 	mkdir -p $(HOME)/.local/runtime
 	chmod 700 $(HOME)/.local/runtime
+	# Execute Oh My Zsh installation
+	bash $(DOTFILES_DIR)/install/oh-my-zsh.sh
 
 unlink: stow-$(OS)
 	stow --delete -t "$(HOME)" runcom

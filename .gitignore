@@ -1,5 +1,64 @@
+# System-specific files
+#-----------------------
 .DS_Store
-*.lock.json
-__pycache__
-system/.custom
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Private/sensitive configurations
+#---------------------------------
 system/.exports
+system/.custom
+config/zsh/private.zsh
+.env
+*.pem
+*.key
+*.keychain
+*.gpg
+
+# Cache and temporary files
+#--------------------------
+*.log
+*.lock.json
+*.cache
+__pycache__/
+*.py[cod]
+*$py.class
+.sass-cache/
+node_modules/
+logs/
+tmp/
+temp/
+.zcompdump*
+.zsh_history
+*~
+
+# Editor-specific files
+#---------------------
+.vscode/
+.idea/
+*.sublime-*
+*.swp
+*.swo
+*~
+\#*\#
+.#*
+.project
+.classpath
+.settings/
+
+# Build and compiled files
+#------------------------
+*.o
+*.so
+*.dylib
+*.dll
+*.exe
+*.out
+build/
+dist/
