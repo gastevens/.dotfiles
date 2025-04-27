@@ -1,0 +1,173 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Colorized output
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Count successes and failures
+SUCCESS_COUNT=0
+FAILURE_COUNT=0
+WARNING_COUNT=0
+
+# Paths
+DOTFILES_DIR="$HOME/.dotfiles"
+CONFIG_DIR="$HOME/.config"
+
+# Print header
+echo -e "${BLUE}===================================${NC}"
+echo -e "${BLUE}  🔍 Verifying dotfiles setup       ${NC}"
+echo -e "${BLUE}===================================${NC}"
+
+# Function to check if a command exists
+command_exists() {
+  command -v "$1" &> /dev/null
+}
+
+# Function for section headers
+section_header() {
+  echo -e "\n${BLUE}$1${NC}"
+  echo -e "${BLUE}$(printf '=%.0s' $(seq 1 ${#1}))${NC}\n"
+}
+
+# Function to check a condition and print result
+check() {
+  local description="$1"
+  local condition="$2"
+  local suggestion="$3"
+  
+  printf "%-60s" "Checking $description..."
+  
+  if eval "$condition"; then
+    echo -e "${GREEN}✅ PASS${NC}"
+    ((SUCCESS_COUNT++))
+    return 0
+  else
+    echo -e "${RED}❌ FAIL${NC}"
+    [ -n "$suggestion" ] && echo -e "  ${YELLOW}→ $suggestion${NC}"
+    ((FAILURE_COUNT++))
+    return 1
+  fi
+}
+
+# Function to print a warning
+warn() {
+  local description="$1"
+  local suggestion="$2"
+  
+  printf "%-60s" "Checking $description..."
+  echo -e "${YELLOW}⚠️  WARNING${NC}"
+  [ -n "$suggestion" ] && echo -e "  ${YELLOW}→ $suggestion${NC}"
+  ((WARNING_COUNT++))
+}
+
+# Check core dependencies
+section_header "Core Dependencies"
+
+check "Homebrew installation" "command_exists brew" \
+  "Install Homebrew: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+
+check "Git installation" "command_exists git" \
+  "Install Git: brew install git"
+
+check "ZSH installation" "command_exists zsh" \
+  "Install ZSH: brew install zsh"
+
+check "GNU Stow installation" "command_exists stow" \
+  "Install Stow: brew install stow"
+
+# Check dotfiles repository
+section_header "Dotfiles Repository"
+
+check "Dotfiles directory exists" "[ -d \"$DOTFILES_DIR\" ]" \
+  "Clone your dotfiles: git clone https://github.com/gastevens/.dotfiles.git ~/.dotfiles"
+
+check "Git remote is configured" "cd \"$DOTFILES_DIR\" && git remote get-url origin" \
+  "Set up remote: git remote add origin https://github.com/gastevens/.dotfiles.git"
+
+# Check symlinks
+section_header "Symlinks"
+
+check ".zshrc symlink" "[ -L \"$HOME/.zshrc\" ] && [ -f \"$HOME/.zshrc\" ]" \
+  "Create symlink: ln -sf $DOTFILES_DIR/runcom/.zshrc $HOME/.zshrc"
+
+check "config directory exists" "[ -d \"$CONFIG_DIR\" ]" \
+  "Create config directory: mkdir -p $HOME/.config"
+
+check "ZSH config symlinks" "[ -L \"$CONFIG_DIR/zsh\" ] || [ -d \"$CONFIG_DIR/zsh\" ]" \
+  "Create symlink: ln -sf $DOTFILES_DIR/config/zsh $CONFIG_DIR/zsh"
+
+# Check shell configuration
+section_header "Shell Configuration"
+
+check "Oh My Zsh is installed" "[ -d \"$HOME/.oh-my-zsh\" ]" \
+  "Install Oh My Zsh: $DOTFILES_DIR/install/oh-my-zsh.sh"
+
+check "Powerlevel10k is installed" "[ -d \"$HOME/.oh-my-zsh/custom/themes/powerlevel10k\" ]" \
+  "Install Powerlevel10k: git clone --depth=1 https://github.com/romkatv/powerlevel10k.git \${ZSH_CUSTOM:-\$HOME/.oh-my-zsh/custom}/themes/powerlevel10k"
+
+check "ZSH autosuggestions plugin" "[ -d \"$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions\" ]" \
+  "Install plugin: git clone https://github.com/zsh-users/zsh-autosuggestions \${ZSH_CUSTOM:-\$HOME/.oh-my-zsh/custom}/plugins/zsh-autosuggestions"
+
+check "ZSH syntax highlighting plugin" "[ -d \"$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting\" ]" \
+  "Install plugin: git clone https://github.com/zsh-users/zsh-syntax-highlighting.git \${ZSH_CUSTOM:-\$HOME/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting"
+
+# Check package managers
+section_header "Package Managers"
+
+check "Homebrew packages" "brew list > /dev/null" \
+  "Brew may be having issues. Run: brew doctor"
+
+if command_exists mas; then
+  check "Mac App Store CLI" "mas account > /dev/null 2>&1 || echo 'Not signed in'" \
+    "Sign in to the Mac App Store application first"
+else
+  warn "Mac App Store CLI (mas)" "Install mas: brew install mas"
+fi
+
+# Check package installation
+section_header "Package Installation"
+
+check "Brewfile exists" "[ -f \"$DOTFILES_DIR/Brewfile\" ]" \
+  "Create Brewfile: brew bundle dump --file=$DOTFILES_DIR/Brewfile"
+
+# Check dot command availability
+section_header "Dot Command"
+
+check "Dot command is executable" "[ -x \"$DOTFILES_DIR/bin/dot\" ]" \
+  "Make dot executable: chmod +x $DOTFILES_DIR/bin/dot"
+
+check "Dot command is in PATH" "command_exists dot" \
+  "Add to PATH: export PATH=\"$DOTFILES_DIR/bin:\$PATH\""
+
+# Check package update script
+check "Package update script exists" "[ -f \"$DOTFILES_DIR/bin/dot-update-packages\" ]" \
+  "Create script: touch $DOTFILES_DIR/bin/dot-update-packages && chmod +x $DOTFILES_DIR/bin/dot-update-packages"
+
+# Check verify setup script (this script)
+check "Verify setup script exists" "[ -f \"$DOTFILES_DIR/bin/dot-verify-setup\" ]" \
+  "Create script: touch $DOTFILES_DIR/bin/dot-verify-setup && chmod +x $DOTFILES_DIR/bin/dot-verify-setup"
+
+# Final summary
+section_header "Summary"
+
+echo -e "Checks passed: ${GREEN}$SUCCESS_COUNT${NC}"
+echo -e "Checks failed: ${RED}$FAILURE_COUNT${NC}"
+echo -e "Warnings: ${YELLOW}$WARNING_COUNT${NC}"
+
+if [ $FAILURE_COUNT -eq 0 ]; then
+  echo -e "\n${GREEN}🎉 Your dotfiles setup looks good!${NC}"
+  
+  if [ $WARNING_COUNT -gt 0 ]; then
+    echo -e "${YELLOW}⚠️  Review warnings and consider fixing them.${NC}"
+  fi
+  
+  echo -e "\n${GREEN}Next steps:${NC}"
+  echo "1. Run 'dot update-packages' to ensure all packages are up to date"
+  echo "2. Run 'p10k configure' if you want to customize your terminal theme"
+  echo "3. Add custom aliases
+

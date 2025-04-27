@@ -195,6 +195,60 @@ git push
 1. Install via Homebrew: `brew install tool-name`
 2. Add to Brewfile: `brew bundle dump --force --file=~/.dotfiles/Brewfile`
 
+## Package Management
+
+This dotfiles repository uses a comprehensive Brewfile to manage:
+
+1. Command-line utilities and development tools (via Homebrew)
+2. GUI applications (via Homebrew Casks)
+3. Mac App Store applications (via mas-cli)
+4. VS Code extensions
+
+### Common Commands
+
+```bash
+# Install all packages from Brewfile
+brew bundle --file=~/.dotfiles/Brewfile
+
+# Update all package managers
+dot update-packages  # Uses custom script
+# OR manually:
+brew update && brew upgrade && mas upgrade
+
+# Check for outdated packages
+brew outdated
+mas outdated
+
+# Add new packages to Brewfile after installing
+brew bundle dump --force --file=~/.dotfiles/Brewfile
+
+# Clean up old packages
+brew cleanup
+```
+
+### Verification
+
+To verify your setup on a new machine or after major changes:
+
+```bash
+dot verify-setup
+```
+
+This checks that:
+
+1. All required tools are installed
+2. Symlinks are properly configured
+3. Configuration files are properly loaded
+4. Package managers are working correctly
+
+### Best Practices
+
+1. Always use Homebrew or mas to install software when available
+2. Keep your Brewfile in version control to ensure consistent environments
+3. Run `dot update-packages` regularly to keep everything up to date
+4. After installing new software, update your Brewfile with `brew bundle dump --force --file=~/.dotfiles/Brewfile`
+5. Review Brewfile changes before committing to ensure only desired packages are included
+
 ## Credits
 
 - Inspired by the [dotfiles community](https://dotfiles.github.io)

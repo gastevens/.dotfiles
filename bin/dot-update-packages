@@ -1,0 +1,109 @@
+#!/usr/bin/env bash
+
+set -e
+
+# Colorized output
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+RED='\033[0;31m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Paths
+DOTFILES_DIR="$HOME/.dotfiles"
+BREWFILE="$DOTFILES_DIR/Brewfile"
+BREWFILE_LOCK="$DOTFILES_DIR/Brewfile.lock.json"
+
+# Print header
+echo -e "${BLUE}===================================${NC}"
+echo -e "${BLUE}  🚀 Updating all package managers  ${NC}"
+echo -e "${BLUE}===================================${NC}"
+
+# Function to check if a command exists
+command_exists() {
+  command -v "$1" &> /dev/null
+}
+
+# Function for section headers
+section_header() {
+  echo -e "\n${BLUE}$1${NC}"
+  echo -e "${BLUE}$(printf '=%.0s' $(seq 1 ${#1}))${NC}\n"
+}
+
+# Check for required commands
+if ! command_exists brew; then
+  echo -e "${RED}Error: Homebrew is not installed.${NC}"
+  echo -e "Install it with: /bin/bash -c \"\$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)\""
+  exit 1
+fi
+
+# Update Homebrew
+section_header "Updating Homebrew"
+brew update
+
+# Upgrade Homebrew packages
+section_header "Upgrading brew packages"
+brew upgrade
+
+# Update Mac App Store applications if mas is installed
+if command_exists mas; then
+  section_header "Upgrading Mac App Store applications"
+  mas upgrade
+else
+  echo -e "${YELLOW}mas command not found. Skipping Mac App Store updates.${NC}"
+fi
+
+# Update npm packages globally if node is installed
+if command_exists npm; then
+  section_header "Updating global npm packages"
+  npm update -g
+fi
+
+# Update Python packages if pip is installed
+if command_exists pip3; then
+  section_header "Updating pip packages"
+  pip3 list --outdated --format=json | python -c "import json, sys; print('\n'.join([x['name'] for x in json.load(sys.stdin)]))" | xargs -n1 pip3 install -U || echo -e "${YELLOW}No pip packages to update or errors occurred.${NC}"
+fi
+
+# Update Ruby gems if gem is installed
+if command_exists gem; then
+  section_header "Updating Ruby gems"
+  gem update
+fi
+
+# Update Rust packages if cargo is installed
+if command_exists cargo; then
+  section_header "Updating Rust packages"
+  cargo install-update -a
+fi
+
+# Dump updated Brewfile
+section_header "Updating Brewfile"
+echo -e "📝 Creating backup of current Brewfile..."
+cp "$BREWFILE" "$BREWFILE.backup"
+echo -e "🔄 Generating new Brewfile..."
+brew bundle dump --force --file="$BREWFILE"
+echo -e "${GREEN}✅ Brewfile updated successfully!${NC}"
+
+# Clean up Homebrew
+section_header "Cleaning up Homebrew"
+brew cleanup
+
+# Final summary
+section_header "Update Summary"
+echo -e "${GREEN}✅ All package managers have been updated!${NC}"
+echo "- Homebrew packages updated"
+[ -f "$BREWFILE_LOCK" ] && echo "- Brewfile lock updated"
+command_exists mas && echo "- Mac App Store applications updated"
+command_exists npm && echo "- Global npm packages updated"
+command_exists pip3 && echo "- Python packages updated"
+command_exists gem && echo "- Ruby gems updated" 
+command_exists cargo && echo "- Rust packages updated"
+
+echo -e "\n${YELLOW}NOTE: To commit changes to the Brewfile, run:${NC}"
+echo -e "  cd $DOTFILES_DIR"
+echo -e "  git diff Brewfile  # Review changes"
+echo -e "  git add Brewfile"
+echo -e "  git commit -m \"chore: Update Brewfile packages\""
+echo -e "  git push"
+
