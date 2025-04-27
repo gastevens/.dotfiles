@@ -4,6 +4,9 @@ BIN_NAME=$(basename "$0")
 COMMAND_NAME=$1
 SUB_COMMAND_NAME=$2
 
+# Set dotfiles directory
+DOTFILES_DIR="$HOME/.dotfiles"
+
 sub_help () {
   echo "Usage: $BIN_NAME <command>"
   echo
@@ -49,9 +52,10 @@ sub_update () {
   topgrade
 }
 
+# Function for update-packages command
 sub_update_packages () {
   if [ -x "${DOTFILES_DIR}/bin/dot-update-packages" ]; then
-    "${DOTFILES_DIR}/bin/dot-update-packages"
+    "${DOTFILES_DIR}/bin/dot-update-packages" "$@"
   else
     echo "Error: update-packages script not found or not executable."
     echo "Check that ${DOTFILES_DIR}/bin/dot-update-packages exists and has execute permissions."
@@ -59,9 +63,10 @@ sub_update_packages () {
   fi
 }
 
+# Function for verify-setup command
 sub_verify_setup () {
   if [ -x "${DOTFILES_DIR}/bin/dot-verify-setup" ]; then
-    "${DOTFILES_DIR}/bin/dot-verify-setup"
+    "${DOTFILES_DIR}/bin/dot-verify-setup" "$@"
   else
     echo "Error: verify-setup script not found or not executable."
     echo "Check that ${DOTFILES_DIR}/bin/dot-verify-setup exists and has execute permissions."
@@ -86,7 +91,9 @@ case $COMMAND_NAME in
     ;;
   *)
     shift
-    sub_${COMMAND_NAME} $@
+    # Replace hyphens with underscores in command name for function call
+    FUNCTION_NAME="sub_${COMMAND_NAME//-/_}"
+    $FUNCTION_NAME $@
     if [ $? = 127 ]; then
       echo "'$COMMAND_NAME' is not a known command or has errors." >&2
       sub_help
