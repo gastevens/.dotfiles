@@ -8,8 +8,6 @@ SUB_COMMAND_NAME=$2
 DOTFILES_DIR="$HOME/.dotfiles"
 
 sub_help () {
-  echo "Usage: $BIN_NAME <command>"
-  echo
   echo "Commands:"
   echo "   clean            Clean up caches (brew, cargo, gem, pip)"
   echo "   dock             Apply macOS Dock settings"
@@ -17,6 +15,9 @@ sub_help () {
   echo "   edit             Open dotfiles in IDE ($VISUAL) and Git GUI ($VISUAL_GIT)"
   echo "   help             This help message"
   echo "   macos            Apply macOS system defaults"
+  echo "   migrate-apps     Migrate apps from Mac App Store to Homebrew"
+  echo "   setup-managers   Install and configure package managers (asdf, mise, etc.)"
+  echo "   setup-tools      Configure development tools (starship, eza, etc.)"
   echo "   test             Run tests"
   echo "   update           Update packages using topgrade"
   echo "   update-packages  Update all packages and generate new Brewfile"
@@ -70,6 +71,36 @@ sub_verify_setup () {
   else
     echo "Error: verify-setup script not found or not executable."
     echo "Check that ${DOTFILES_DIR}/bin/dot-verify-setup exists and has execute permissions."
+    return 1
+  fi
+}
+
+sub_migrate_apps () {
+  if [ -x "${DOTFILES_DIR}/bin/dot-migrate-apps" ]; then
+    "${DOTFILES_DIR}/bin/dot-migrate-apps" "$@"
+  else
+    echo "Error: migrate-apps script not found or not executable."
+    echo "Check that ${DOTFILES_DIR}/bin/dot-migrate-apps exists and has execute permissions."
+    return 1
+  fi
+}
+
+sub_setup_tools () {
+  if [ -x "${DOTFILES_DIR}/config/shell/tool-configs.sh" ]; then
+    "${DOTFILES_DIR}/config/shell/tool-configs.sh" "$@"
+  else
+    echo "Error: tool-configs.sh script not found or not executable."
+    echo "Check that ${DOTFILES_DIR}/config/shell/tool-configs.sh exists and has execute permissions."
+    return 1
+  fi
+}
+
+sub_setup_managers () {
+  if [ -x "${DOTFILES_DIR}/install/package-managers.sh" ]; then
+    "${DOTFILES_DIR}/install/package-managers.sh" "$@"
+  else
+    echo "Error: package-managers.sh script not found or not executable."
+    echo "Check that ${DOTFILES_DIR}/install/package-managers.sh exists and has execute permissions."
     return 1
   fi
 }
