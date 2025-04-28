@@ -7,6 +7,9 @@ My personal dotfiles for macOS development environment setup. This repository co
 - **Modern ZSH Configuration**: Modular structure with Oh My Zsh and Powerlevel10k theme
 - **Easy Installation**: Minimal effort to install everything using GNU Stow and Makefile
 - **Package Management**: Homebrew with Brewfile for consistent software installation
+- **Multiple Language Version Managers**: Support for asdf, mise, volta, pyenv, and deno
+- **Modern CLI Tools**: Configured starship prompt, eza, bat, and other productivity tools
+- **App Migration**: Tools to migrate from Mac App Store to Homebrew versions
 - **macOS Optimizations**: Custom settings and productivity enhancements
 - **Well-organized and Modular**: Easy to understand, maintain, and customize
 - **Supports Apple Silicon and Intel Macs**: Tested on various macOS versions
@@ -29,9 +32,12 @@ My personal dotfiles for macOS development environment setup. This repository co
 │   │   ├── path.zsh       # PATH modifications
 │   │   ├── private.zsh    # Private/sensitive settings (gitignored)
 │   │   └── utils.zsh      # Utility functions
+│   ├── shell/             # Shell tool configurations
+│   │   └── tool-configs.sh # Tool configuration script
 │   └── ...
 ├── install/               # Installation scripts
-│   └── oh-my-zsh.sh       # Oh My Zsh and plugins installer
+│   ├── oh-my-zsh.sh       # Oh My Zsh and plugins installer
+│   └── package-managers.sh # Package manager installation script
 ├── macos/                 # macOS-specific settings and scripts
 ├── runcom/                # Run commands, like .zshrc, .bashrc
 │   └── .zshrc             # Main ZSH configuration file
@@ -88,6 +94,18 @@ chmod +x ~/.dotfiles/install/oh-my-zsh.sh
 
 ```bash
 brew bundle --file=~/.dotfiles/Brewfile
+```
+
+8. Set up package managers (optional):
+
+```bash
+dot setup-managers
+```
+
+9. Configure development tools (optional):
+
+```bash
+dot setup-tools
 ```
 
 ## ZSH Configuration
@@ -151,8 +169,6 @@ The `dot` command provides easy access to common dotfiles maintenance tasks:
 
 ```
 $ dot help
-Usage: dot <command>
-
 Commands:
    clean            Clean up caches (brew, cargo, gem, pip)
    dock             Apply macOS Dock settings
@@ -160,8 +176,34 @@ Commands:
    edit             Open dotfiles in IDE (code) and Git GUI
    help             This help message
    macos            Apply macOS system defaults
+   migrate-apps     Migrate apps from Mac App Store to Homebrew
+   setup-managers   Install and configure package managers (asdf, mise, etc.)
+   setup-tools      Configure development tools (starship, eza, etc.)
    test             Run tests
-   update           Update packages and pkg managers (brew, casks, cargo, pip3, npm, gems, macOS)
+   update           Update packages using topgrade
+   update-packages  Update all packages and generate new Brewfile
+   verify-setup     Verify dotfiles setup and configuration
+```
+
+### Key Command Usage Examples
+
+```bash
+# Update all packages and generate new Brewfile
+dot update-packages
+
+# Verify your dotfiles setup
+dot verify-setup
+
+# Set up package managers like asdf, mise, volta
+dot setup-managers
+
+# Configure tools like starship, eza, bat
+dot setup-tools
+
+# Migrate apps from Mac App Store to Homebrew
+dot migrate-apps --dry-run    # Test first without making changes
+dot migrate-apps kindle       # Migrate just Kindle
+dot migrate-apps              # Migrate all supported apps
 ```
 
 ## Customization
@@ -248,6 +290,133 @@ This checks that:
 3. Run `dot update-packages` regularly to keep everything up to date
 4. After installing new software, update your Brewfile with `brew bundle dump --force --file=~/.dotfiles/Brewfile`
 5. Review Brewfile changes before committing to ensure only desired packages are included
+
+## Package Managers
+
+This repository includes configuration and setup for several language version managers:
+
+### ASDF Version Manager
+
+ASDF is a universal version manager for multiple languages in a single tool.
+
+```bash
+# Install ASDF and plugins
+dot setup-managers
+
+# Check available versions of a language
+asdf list-all nodejs
+
+# Install a specific version
+asdf install nodejs 20.12.2
+
+# Set a global version
+asdf global nodejs 20.12.2
+```
+
+Configuration is stored in:
+- `~/.tool-versions`: Global versions for each language
+- `~/.asdfrc`: ASDF configuration
+
+### Mise (Modern alternative to ASDF)
+
+Mise is a faster and more modern alternative to ASDF.
+
+```bash
+# Install and configure Mise
+dot setup-managers
+
+# Basic usage
+mise use node@20
+mise install python@3.13
+```
+
+### Volta (JavaScript Tool Manager)
+
+Volta is dedicated to managing Node.js, npm, yarn, and global Node packages.
+
+```bash
+# Install specific Node.js version
+volta install node@18
+
+# Install global packages
+volta install typescript
+```
+
+### Pyenv (Python Version Manager)
+
+```bash
+# List available Python versions
+pyenv install --list
+
+# Install a specific version
+pyenv install 3.13.0
+
+# Set global Python version
+pyenv global 3.13.0
+```
+
+## Development Tools
+
+This repository includes configuration for modern development tools:
+
+### Starship Prompt
+
+A minimal, fast, and customizable prompt for any shell.
+
+```bash
+# Configure starship
+dot setup-tools
+
+# Edit configuration manually
+nano ~/.config/starship.toml
+```
+
+### Modern Command-Line Replacements
+
+- **eza**: Modern replacement for `ls`
+- **bat**: Modern replacement for `cat`
+- **fd**: Modern replacement for `find`
+- **ripgrep**: Modern replacement for `grep`
+- **fzf**: Fuzzy finder for files and history
+- **zoxide**: Smarter `cd` command with frecency
+
+To configure all these tools at once:
+
+```bash
+dot setup-tools
+```
+
+## App Migration
+
+The repository includes a tool to help migrate applications from the Mac App Store to their Homebrew equivalents. This helps maintain applications through Homebrew for easier management.
+
+Currently supported migrations:
+- CleanMyMac
+- FileZilla Pro → FileZilla
+- Kindle
+- Steam Link → Steam
+
+```bash
+# Show available options
+dot migrate-apps --help
+
+# Test migration without making changes
+dot migrate-apps --dry-run
+
+# Migrate a specific app
+dot migrate-apps kindle
+
+# Migrate all supported apps
+dot migrate-apps all
+```
+
+The migration process:
+1. Backs up app preferences and data
+2. Uninstalls the Mac App Store version
+3. Installs the Homebrew version
+4. Restores preferences where possible
+
+This ensures a smooth transition without losing your settings.
 
 ## Credits
 
