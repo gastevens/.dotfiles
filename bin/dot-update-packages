@@ -1,7 +1,5 @@
 #!/usr/bin/env bash
 
-set -e
-
 # Colorized output
 GREEN='\033[0;32m'
 YELLOW='\033[0;33m'
@@ -14,10 +12,42 @@ DOTFILES_DIR="$HOME/.dotfiles"
 BREWFILE="$DOTFILES_DIR/Brewfile"
 BREWFILE_LOCK="$DOTFILES_DIR/Brewfile.lock.json"
 
+# Settings
+DRY_RUN=false
+GREEDY=false
+
+# Environment variables to reduce noise
+export HOMEBREW_NO_ENV_HINTS=1
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --dry-run)
+      DRY_RUN=true
+      shift
+      ;;
+    --greedy)
+      GREEDY=true
+      shift
+      ;;
+    *)
+      echo -e "${RED}Unknown option: $1${NC}"
+      echo "Usage: dot update-packages [--dry-run] [--greedy]"
+      echo "  --dry-run: Show what would be done without making changes"
+      echo "  --greedy: Update casks that auto-update themselves"
+      exit 1
+      ;;
+  esac
+done
+
 # Print header
 echo -e "${BLUE}===================================${NC}"
 echo -e "${BLUE}  🚀 Updating all package managers  ${NC}"
 echo -e "${BLUE}===================================${NC}"
+
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}Running in dry-run mode. No changes will be made.${NC}"
+fi
 
 # Function to check if a command exists
 command_exists() {
@@ -30,6 +60,15 @@ section_header() {
   echo -e "${BLUE}$(printf '=%.0s' $(seq 1 ${#1}))${NC}\n"
 }
 
+# Function to handle errors with better messages
+handle_error() {
+  local exit_code=$?
+  if [ $exit_code -ne 0 ]; then
+    echo -e "${RED}Error: $1 failed with exit code $exit_code${NC}"
+    echo -e "${YELLOW}$2${NC}"
+  fi
+}
+
 # Check for required commands
 if ! command_exists brew; then
   echo -e "${RED}Error: Homebrew is not installed.${NC}"
@@ -39,18 +78,71 @@ fi
 
 # Update Homebrew
 section_header "Updating Homebrew"
-brew update
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}Would run: brew update${NC}"
+else
+  brew update
+  handle_error "brew update" "Try running 'brew doctor' to diagnose issues"
+fi
 
 # Upgrade Homebrew packages
 section_header "Upgrading brew packages"
-brew upgrade
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}Would run: brew upgrade${NC}"
+  brew outdated
+else
+  # Capture the output to look for link errors
+  BREW_UPGRADE_OUTPUT=$(brew upgrade 2>&1) || true
+  echo "$BREW_UPGRADE_OUTPUT"
+
+  # Check for link errors and fix them
+  if echo "$BREW_UPGRADE_OUTPUT" | grep -q "The \`brew link\` step did not complete successfully"; then
+    echo -e "${YELLOW}Detected brew link errors. Attempting to fix...${NC}"
+    
+    # Extract package names with link errors
+    LINK_ERROR_PKGS=$(echo "$BREW_UPGRADE_OUTPUT" | grep -A1 "The \`brew link\` step did not complete successfully" | grep -o "brew link --overwrite [^ ]*" | awk '{print $3}')
+    
+    for pkg in $LINK_ERROR_PKGS; do
+      echo -e "${YELLOW}Fixing link for $pkg...${NC}"
+      brew link --overwrite "$pkg" || true
+    done
+  fi
+fi
 
 # Update Mac App Store applications if mas is installed
 if command_exists mas; then
   section_header "Upgrading Mac App Store applications"
-  mas upgrade
+  if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}Would run: mas upgrade${NC}"
+    mas outdated
+  else
+    mas upgrade
+    handle_error "mas upgrade" "Try signing in to the Mac App Store again"
+  fi
 else
   echo -e "${YELLOW}mas command not found. Skipping Mac App Store updates.${NC}"
+  echo -e "${YELLOW}→ Install mas with: brew install mas${NC}"
+fi
+
+# Update Homebrew casks
+section_header "Upgrading Homebrew casks"
+if [ "$DRY_RUN" = true ]; then
+  if [ "$GREEDY" = true ]; then
+    echo -e "${YELLOW}Would run: brew upgrade --cask --greedy${NC}"
+  else
+    echo -e "${YELLOW}Would run: brew upgrade --cask${NC}"
+  fi
+  brew outdated --cask
+else
+  if [ "$GREEDY" = true ]; then
+    echo -e "${YELLOW}Updating all casks including auto-updating ones...${NC}"
+    brew upgrade --cask --greedy
+  else
+    echo -e "${YELLOW}Updating casks (excluding auto-updating ones)...${NC}"
+    echo -e "${YELLOW}Use --greedy flag to update all casks${NC}"
+    brew upgrade --cask
+  fi
+  handle_error "brew upgrade --cask" "Some casks might require manual updating"
 fi
 
 # Update npm packages globally if node is installed
@@ -79,31 +171,49 @@ fi
 
 # Dump updated Brewfile
 section_header "Updating Brewfile"
-echo -e "📝 Creating backup of current Brewfile..."
-cp "$BREWFILE" "$BREWFILE.backup"
-echo -e "🔄 Generating new Brewfile..."
-brew bundle dump --force --file="$BREWFILE"
-echo -e "${GREEN}✅ Brewfile updated successfully!${NC}"
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}Would create backup of current Brewfile${NC}"
+  echo -e "${YELLOW}Would generate new Brewfile using 'brew bundle dump'${NC}"
+else
+  echo -e "📝 Creating backup of current Brewfile..."
+  cp "$BREWFILE" "$BREWFILE.backup"
+  echo -e "🔄 Generating new Brewfile..."
+  brew bundle dump --force --file="$BREWFILE"
+  handle_error "brew bundle dump" "Failed to update Brewfile"
+  echo -e "${GREEN}✅ Brewfile updated successfully!${NC}"
+fi
 
 # Clean up Homebrew
 section_header "Cleaning up Homebrew"
-brew cleanup
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}Would run: brew cleanup${NC}"
+  echo -e "${YELLOW}This would free up:${NC}"
+  brew cleanup --dry-run
+else
+  brew cleanup
+  handle_error "brew cleanup" "Failed to clean up Homebrew"
+fi
 
 # Final summary
 section_header "Update Summary"
-echo -e "${GREEN}✅ All package managers have been updated!${NC}"
-echo "- Homebrew packages updated"
-[ -f "$BREWFILE_LOCK" ] && echo "- Brewfile lock updated"
-command_exists mas && echo "- Mac App Store applications updated"
-command_exists npm && echo "- Global npm packages updated"
-command_exists pip3 && echo "- Python packages updated"
-command_exists gem && echo "- Ruby gems updated" 
-command_exists cargo && echo "- Rust packages updated"
+if [ "$DRY_RUN" = true ]; then
+  echo -e "${YELLOW}Dry run completed. No changes were made.${NC}"
+  echo -e "\n${YELLOW}To apply these changes, run without --dry-run flag.${NC}"
+else
+  echo -e "${GREEN}✅ All package managers have been updated!${NC}"
+  echo "- Homebrew packages updated"
+  [ -f "$BREWFILE_LOCK" ] && echo "- Brewfile lock updated"
+  command_exists mas && echo "- Mac App Store applications updated"
+  command_exists npm && echo "- Global npm packages updated"
+  command_exists pip3 && echo "- Python packages updated"
+  command_exists gem && echo "- Ruby gems updated" 
+  command_exists cargo && echo "- Rust packages updated"
 
-echo -e "\n${YELLOW}NOTE: To commit changes to the Brewfile, run:${NC}"
-echo -e "  cd $DOTFILES_DIR"
-echo -e "  git diff Brewfile  # Review changes"
-echo -e "  git add Brewfile"
-echo -e "  git commit -m \"chore: Update Brewfile packages\""
-echo -e "  git push"
+  echo -e "\n${YELLOW}NOTE: To commit changes to the Brewfile, run:${NC}"
+  echo -e "  cd $DOTFILES_DIR"
+  echo -e "  git diff Brewfile  # Review changes"
+  echo -e "  git add Brewfile"
+  echo -e "  git commit -m \"chore: Update Brewfile packages\""
+  echo -e "  git push"
+fi
 
