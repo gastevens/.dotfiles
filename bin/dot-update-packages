@@ -148,25 +148,94 @@ fi
 # Update npm packages globally if node is installed
 if command_exists npm; then
   section_header "Updating global npm packages"
-  npm update -g
+  if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}Would run: npm update -g${NC}"
+    echo -e "${YELLOW}Would update these packages:${NC}"
+    npm outdated -g || echo -e "${YELLOW}No outdated npm packages found.${NC}"
+  else
+    npm update -g
+    handle_error "npm update" "You may need to run with sudo for global packages"
+  fi
 fi
 
 # Update Python packages if pip is installed
 if command_exists pip3; then
   section_header "Updating pip packages"
-  pip3 list --outdated --format=json | python -c "import json, sys; print('\n'.join([x['name'] for x in json.load(sys.stdin)]))" | xargs -n1 pip3 install -U || echo -e "${YELLOW}No pip packages to update or errors occurred.${NC}"
+  
+  # Check if python3 is available
+  if ! command_exists python3; then
+    echo -e "${YELLOW}python3 command not found. Skipping pip package updates.${NC}"
+    echo -e "${YELLOW}→ Install Python 3 with: brew install python@3.13${NC}"
+  else
+    if [ "$DRY_RUN" = true ]; then
+      echo -e "${YELLOW}Would run: pip3 upgrade outdated packages${NC}"
+      echo -e "${YELLOW}Would update these packages:${NC}"
+      pip3 list --outdated || echo -e "${YELLOW}No outdated pip packages found.${NC}"
+    else
+      # Use python3 instead of python for parsing the JSON output
+      PIP_OUTDATED=$(pip3 list --outdated --format=json 2>/dev/null)
+      if [ -n "$PIP_OUTDATED" ]; then
+        echo "$PIP_OUTDATED" | python3 -c "import json, sys; print('\n'.join([x['name'] for x in json.load(sys.stdin)]))" | xargs -n1 pip3 install -U || echo -e "${YELLOW}Errors occurred during pip package updates.${NC}"
+      else
+        echo -e "${YELLOW}No outdated pip packages found.${NC}"
+      fi
+    fi
+  fi
 fi
 
 # Update Ruby gems if gem is installed
 if command_exists gem; then
   section_header "Updating Ruby gems"
-  gem update
+  
+  # Check if using system Ruby (which often has permission issues)
+  RUBY_PATH=$(which ruby)
+  if [[ "$RUBY_PATH" == "/usr/bin/ruby" || "$RUBY_PATH" == "/System/Library/Frameworks/Ruby.framework"* ]]; then
+    echo -e "${YELLOW}Warning: Using system Ruby. You may encounter permission issues.${NC}"
+    echo -e "${YELLOW}→ Consider installing Ruby via Homebrew: brew install ruby${NC}"
+  fi
+  
+  if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}Would run: gem update${NC}"
+    echo -e "${YELLOW}Would update these gems:${NC}"
+    gem outdated || echo -e "${YELLOW}No outdated gems found.${NC}"
+  else
+    # Try to update gems, capture permission errors
+    GEM_OUTPUT=$(gem update 2>&1) || true
+    echo "$GEM_OUTPUT"
+    
+    # Check for permission errors and suggest solution
+    if echo "$GEM_OUTPUT" | grep -q "You don't have write permissions"; then
+      echo -e "${YELLOW}Permission error detected. Try one of the following:${NC}"
+      echo -e "${YELLOW}1. Use Homebrew Ruby instead: brew install ruby${NC}"
+      echo -e "${YELLOW}2. Use gem with user install flag: gem update --user-install${NC}"
+      echo -e "${YELLOW}3. Use sudo (not recommended): sudo gem update${NC}"
+    fi
+  fi
 fi
 
 # Update Rust packages if cargo is installed
 if command_exists cargo; then
   section_header "Updating Rust packages"
-  cargo install-update -a
+  
+  # Check if cargo-update is installed
+  if ! command_exists cargo-install-update; then
+    echo -e "${YELLOW}cargo-update not installed. Installing it first...${NC}"
+    if [ "$DRY_RUN" = true ]; then
+      echo -e "${YELLOW}Would run: cargo install cargo-update${NC}"
+    else
+      cargo install cargo-update
+      handle_error "cargo install cargo-update" "Failed to install cargo-update"
+    fi
+  fi
+  
+  if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}Would run: cargo install-update -a${NC}"
+    echo -e "${YELLOW}Would update these packages:${NC}"
+    cargo install-update -l || echo -e "${YELLOW}No outdated cargo packages found.${NC}"
+  else
+    cargo install-update -a
+    handle_error "cargo install-update" "Failed to update cargo packages"
+  fi
 fi
 
 # Dump updated Brewfile
