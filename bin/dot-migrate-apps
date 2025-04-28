@@ -1,0 +1,512 @@
+#!/usr/bin/env bash
+
+# dot-migrate-apps
+# This script helps migrate applications from Mac App Store to Homebrew versions
+
+# ===== Colors and formatting =====
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[0;33m'
+BLUE='\033[0;34m'
+BOLD='\033[1m'
+NC='\033[0m' # No Color
+
+# ===== Defaults =====
+DRY_RUN=false
+SPECIFIC_APP=""
+BACKUP_DIR="$HOME/.dotfiles_backup/app_migrations/$(date +%Y%m%d_%H%M%S)"
+DOTFILES_DIR="$HOME/.dotfiles"
+
+# ===== Helper Functions =====
+
+# Print usage information
+usage() {
+    echo "Usage: dot-migrate-apps [options] [app]"
+    echo ""
+    echo "Options:"
+    echo "  --dry-run       Show what would be done without making changes"
+    echo "  --help          Show this help message"
+    echo ""
+    echo "Available apps to migrate:"
+    echo "  cleanmymac      Migrate CleanMyMac from MAS to Homebrew"
+    echo "  filezilla       Migrate FileZilla Pro (MAS) to FileZilla (Homebrew)"
+    echo "  kindle          Migrate Kindle from MAS to Homebrew"
+    echo "  steamlink       Migrate Steam Link to Steam (includes Steam Link)"
+    echo "  all             Migrate all supported apps (default)"
+    echo ""
+    echo "Examples:"
+    echo "  dot-migrate-apps --dry-run               # Dry run all migrations"
+    echo "  dot-migrate-apps kindle                  # Migrate only Kindle"
+    echo "  dot-migrate-apps --dry-run cleanmymac    # Dry run CleanMyMac migration"
+    exit 0
+}
+
+# Print section headers
+print_header() {
+    echo -e "\n${BLUE}${BOLD}===== $1 =====${NC}\n"
+}
+
+# Check if a command exists
+command_exists() {
+    command -v "$1" &> /dev/null
+}
+
+# Success message
+success() {
+    echo -e "${GREEN}✓ $1${NC}"
+}
+
+# Error message
+error() {
+    echo -e "${RED}✗ $1${NC}"
+}
+
+# Warning message
+warning() {
+    echo -e "${YELLOW}⚠ $1${NC}"
+}
+
+# Info message (for dry run)
+info() {
+    echo -e "${BLUE}ℹ $1${NC}"
+}
+
+# Create backup directory
+create_backup_dir() {
+    if [ "$DRY_RUN" = true ]; then
+        info "Would create backup directory: $BACKUP_DIR"
+    else
+        mkdir -p "$BACKUP_DIR"
+        success "Created backup directory: $BACKUP_DIR"
+    fi
+}
+
+# Check if an app is installed via MAS
+is_app_installed_mas() {
+    local app_id=$1
+    mas list | grep -q "$app_id"
+}
+
+# Check if an app is installed via Homebrew
+is_app_installed_brew() {
+    local app_name=$1
+    brew list --cask "$app_name" &>/dev/null
+}
+
+# Backup application data
+backup_app_data() {
+    local app_name=$1
+    local source_dir=$2
+    
+    if [ ! -d "$source_dir" ]; then
+        warning "Source directory does not exist: $source_dir"
+        return 1
+    fi
+    
+    local backup_path="$BACKUP_DIR/$app_name"
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "Would backup $source_dir to $backup_path"
+    else
+        mkdir -p "$backup_path"
+        cp -R "$source_dir"/* "$backup_path"/ 2>/dev/null || true
+        success "Backed up $app_name data to $backup_path"
+    fi
+}
+
+# Backup application preferences
+backup_app_preferences() {
+    local app_name=$1
+    local pref_domain=$2
+    
+    local backup_path="$BACKUP_DIR/$app_name"
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "Would backup $app_name preferences ($pref_domain) to $backup_path"
+    else
+        mkdir -p "$backup_path"
+        defaults export "$pref_domain" "$backup_path/preferences.plist" 2>/dev/null || true
+        success "Backed up $app_name preferences to $backup_path/preferences.plist"
+    fi
+}
+
+# Uninstall MAS application
+uninstall_mas_app() {
+    local app_id=$1
+    local app_name=$2
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "Would uninstall $app_name from Mac App Store (ID: $app_id)"
+    else
+        echo "Uninstalling $app_name from Mac App Store..."
+        # MAS doesn't provide a CLI for uninstallation, so we guide the user
+        warning "Mac App Store doesn't support command-line uninstallation."
+        echo "Please manually delete the application from the Applications folder."
+        echo "Press Enter to continue once you've removed the app, or Ctrl+C to cancel."
+        read -r
+    fi
+}
+
+# Install Homebrew application
+install_brew_app() {
+    local app_name=$1
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "Would install $app_name using Homebrew"
+    else
+        echo "Installing $app_name using Homebrew..."
+        brew install --cask "$app_name"
+        if [ $? -eq 0 ]; then
+            success "Installed $app_name successfully"
+        else
+            error "Failed to install $app_name"
+            return 1
+        fi
+    fi
+}
+
+# Restore application preferences
+restore_app_preferences() {
+    local app_name=$1
+    local pref_domain=$2
+    
+    local pref_file="$BACKUP_DIR/$app_name/preferences.plist"
+    
+    if [ ! -f "$pref_file" ]; then
+        warning "No preferences backup found for $app_name"
+        return 1
+    fi
+    
+    if [ "$DRY_RUN" = true ]; then
+        info "Would restore $app_name preferences from $pref_file"
+    else
+        defaults import "$pref_domain" "$pref_file" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            success "Restored $app_name preferences"
+        else
+            warning "Failed to restore $app_name preferences"
+        fi
+    fi
+}
+
+# ===== App-specific Migration Functions =====
+
+# Migrate CleanMyMac
+migrate_cleanmymac() {
+    print_header "Migrating CleanMyMac"
+    
+    local mas_app_id="1339170533"
+    local brew_app_name="cleanmymac"
+    local app_name="CleanMyMac"
+    
+    # Check if already using Homebrew version
+    if is_app_installed_brew "$brew_app_name"; then
+        success "$app_name is already installed via Homebrew"
+        return 0
+    fi
+    
+    # Check if MAS version is installed
+    if ! is_app_installed_mas "$mas_app_id"; then
+        warning "$app_name is not installed via Mac App Store"
+        
+        # Offer to install via Homebrew if not present at all
+        if [ "$DRY_RUN" = true ]; then
+            info "Would install $app_name via Homebrew"
+        else
+            echo "Would you like to install $app_name via Homebrew? (y/n)"
+            read -r response
+            if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                install_brew_app "$brew_app_name"
+            else
+                echo "Skipping $app_name installation"
+            fi
+        fi
+        return 0
+    fi
+    
+    # Backup preferences and data
+    backup_app_preferences "$app_name" "com.macpaw.CleanMyMac4"
+    backup_app_data "$app_name" "$HOME/Library/Application Support/CleanMyMac X"
+    
+    # Uninstall MAS version
+    uninstall_mas_app "$mas_app_id" "$app_name"
+    
+    # Install Homebrew version
+    install_brew_app "$brew_app_name"
+    
+    # Restore preferences
+    restore_app_preferences "$app_name" "com.macpaw.CleanMyMac4"
+    
+    success "Migration of $app_name completed successfully"
+}
+
+# Migrate FileZilla Pro
+migrate_filezilla() {
+    print_header "Migrating FileZilla Pro"
+    
+    local mas_app_id="1298486723"
+    local brew_app_name="filezilla"
+    local app_name="FileZilla"
+    
+    # Check if already using Homebrew version
+    if is_app_installed_brew "$brew_app_name"; then
+        success "$app_name is already installed via Homebrew"
+        return 0
+    fi
+    
+    # Check if MAS version is installed
+    if ! is_app_installed_mas "$mas_app_id"; then
+        warning "$app_name Pro is not installed via Mac App Store"
+        
+        # Offer to install via Homebrew if not present at all
+        if [ "$DRY_RUN" = true ]; then
+            info "Would install $app_name via Homebrew"
+        else
+            echo "Would you like to install $app_name via Homebrew? (y/n)"
+            read -r response
+            if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                install_brew_app "$brew_app_name"
+            else
+                echo "Skipping $app_name installation"
+            fi
+        fi
+        return 0
+    fi
+    
+    # Backup preferences and data
+    backup_app_preferences "$app_name" "org.filezilla-project.filezilla"
+    backup_app_data "$app_name" "$HOME/.config/filezilla"
+    
+    # Uninstall MAS version
+    uninstall_mas_app "$mas_app_id" "$app_name Pro"
+    
+    # Install Homebrew version
+    install_brew_app "$brew_app_name"
+    
+    # Note about differences
+    warning "Note: FileZilla (free) has fewer features than FileZilla Pro"
+    warning "Your site manager settings should be preserved, but some Pro features may not be available"
+    
+    success "Migration of $app_name completed successfully"
+}
+
+# Migrate Kindle
+migrate_kindle() {
+    print_header "Migrating Kindle"
+    
+    local mas_app_id="302584613"
+    local brew_app_name="kindle"
+    local app_name="Kindle"
+    
+    # Check if already using Homebrew version
+    if is_app_installed_brew "$brew_app_name"; then
+        success "$app_name is already installed via Homebrew"
+        return 0
+    fi
+    
+    # Check if MAS version is installed
+    if ! is_app_installed_mas "$mas_app_id"; then
+        warning "$app_name is not installed via Mac App Store"
+        
+        # Offer to install via Homebrew if not present at all
+        if [ "$DRY_RUN" = true ]; then
+            info "Would install $app_name via Homebrew"
+        else
+            echo "Would you like to install $app_name via Homebrew? (y/n)"
+            read -r response
+            if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                install_brew_app "$brew_app_name"
+            else
+                echo "Skipping $app_name installation"
+            fi
+        fi
+        return 0
+    fi
+    
+    # Backup preferences and data
+    backup_app_preferences "$app_name" "com.amazon.Kindle"
+    backup_app_data "$app_name" "$HOME/Library/Containers/com.amazon.Kindle/Data/Library/Application Support/Kindle"
+    
+    # Special handling for Kindle books
+    if [ "$DRY_RUN" = true ]; then
+        info "Would backup Kindle books from ~/Library/Application Support/Kindle/My Kindle Content"
+    else
+        mkdir -p "$BACKUP_DIR/$app_name/KindleContent"
+        cp -R "$HOME/Library/Application Support/Kindle/My Kindle Content" "$BACKUP_DIR/$app_name/KindleContent" 2>/dev/null || true
+        success "Backed up Kindle books to $BACKUP_DIR/$app_name/KindleContent"
+    fi
+    
+    # Uninstall MAS version
+    uninstall_mas_app "$mas_app_id" "$app_name"
+    
+    # Install Homebrew version
+    install_brew_app "$brew_app_name"
+    
+    # Advice for manual steps
+    echo ""
+    echo "After installation completes, you may need to:"
+    echo "1. Launch Kindle and sign in with your Amazon account"
+    echo "2. Your books will be re-downloaded automatically upon sign-in"
+    echo "3. If books don't appear, check $BACKUP_DIR/$app_name/KindleContent"
+    
+    success "Migration of $app_name completed successfully"
+}
+
+# Migrate Steam Link
+migrate_steamlink() {
+    print_header "Migrating Steam Link"
+    
+    local mas_app_id="1246969117"
+    local brew_app_name="steam"
+    local app_name="Steam"
+    
+    # Check if already using Homebrew version
+    if is_app_installed_brew "$brew_app_name"; then
+        success "$app_name is already installed via Homebrew"
+        return 0
+    fi
+    
+    # Check if MAS version is installed
+    if ! is_app_installed_mas "$mas_app_id"; then
+        warning "Steam Link is not installed via Mac App Store"
+        
+        # Offer to install via Homebrew if not present at all
+        if [ "$DRY_RUN" = true ]; then
+            info "Would install $app_name via Homebrew"
+        else
+            echo "Would you like to install $app_name via Homebrew? (y/n)"
+            read -r response
+            if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                install_brew_app "$brew_app_name"
+            else
+                echo "Skipping $app_name installation"
+            fi
+        fi
+        return 0
+    fi
+    
+    # Uninstall MAS version
+    uninstall_mas_app "$mas_app_id" "Steam Link"
+    
+    # Install Homebrew version
+    install_brew_app "$brew_app_name"
+    
+    # Advice for manual steps
+    echo ""
+    echo "After installation completes, you may need to:"
+    echo "1. Launch Steam and sign in with your Steam account"
+    echo "2. In Steam, click on the Remote Play section to access the Steam Link functionality"
+    echo "3. Connect your devices following Steam's Remote Play instructions"
+    
+    success "Migration of Steam Link to $app_name completed successfully"
+}
+
+# ===== Main functions =====
+
+# Run a single migration
+run_migration() {
+    local app=$1
+    
+    case "$app" in
+        "cleanmymac")
+            migrate_cleanmymac
+            ;;
+        "filezilla")
+            migrate_filezilla
+            ;;
+        "kindle")
+            migrate_kindle
+            ;;
+        "steamlink")
+            migrate_steamlink
+            ;;
+        *)
+            error "Unknown app: $app"
+            usage
+            ;;
+    esac
+}
+
+# Run all migrations
+run_all_migrations() {
+    create_backup_dir
+    
+    migrate_cleanmymac
+    migrate_filezilla
+    migrate_kindle
+    migrate_steamlink
+    
+    print_header "Migration Summary"
+    echo "Migration operations completed."
+    
+    if [ "$DRY_RUN" = true ]; then
+        echo "This was a dry run. No changes were made."
+    else
+        echo "Backup files are stored in: $BACKUP_DIR"
+    fi
+}
+
+# Parse command line arguments
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --dry-run)
+            DRY_RUN=true
+            shift
+            ;;
+        --help)
+            usage
+            ;;
+        cleanmymac|filezilla|kindle|steamlink|all)
+            SPECIFIC_APP="$1"
+            shift
+            ;;
+        *)
+            error "Unknown option: $1"
+            usage
+            ;;
+    esac
+done
+
+# Check for required commands
+if ! command_exists brew; then
+    error "Homebrew is not installed. Please install it first."
+    echo "Visit https://brew.sh for installation instructions."
+    exit 1
+fi
+
+if ! command_exists mas; then
+    error "mas-cli is not installed. Please install it first."
+    echo "Run: brew install mas"
+    exit 1
+fi
+
+# Print intro banner
+echo -e "${BLUE}${BOLD}===== Mac App Store to Homebrew Migration Tool =====${NC}"
+echo "This tool helps migrate applications from Mac App Store to Homebrew casks."
+
+if [ "$DRY_RUN" = true ]; then
+    echo -e "${YELLOW}Running in dry-run mode. No changes will be made.${NC}"
+fi
+
+echo ""
+
+# Run the appropriate migration(s)
+if [ -z "$SPECIFIC_APP" ] || [ "$SPECIFIC_APP" = "all" ]; then
+    run_all_migrations
+else
+    create_backup_dir
+    run_migration "$SPECIFIC_APP"
+    
+    print_header "Migration Summary"
+    echo "Migration of $SPECIFIC_APP completed."
+    
+    if [ "$DRY_RUN" = true ]; then
+        echo "This was a dry run. No changes were made."
+    else
+        echo "Backup files are stored in: $BACKUP_DIR"
+    fi
+fi
+
+echo ""
+echo "Thank you for using the Mac App Store to Homebrew migration tool!"
+echo "Your applications should now be managed through Homebrew for easier updates."
